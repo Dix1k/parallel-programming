@@ -3,7 +3,7 @@ function solveTridiagonalThomas(a, b, c, d) {
   const cPrime = new Array(n);
   const dPrime = new Array(n);
 
-  // Прямой ход
+  // Прямой ход: мы последовательно упрощаем систему, избавляясь от зависимости от прошлых переменных.
   cPrime[0] = c[0] / b[0];
   dPrime[0] = d[0] / b[0];
 
@@ -13,7 +13,7 @@ function solveTridiagonalThomas(a, b, c, d) {
     dPrime[i] = (d[i] - a[i] * dPrime[i - 1]) / denom;
   }
 
-  // Обратный ход
+  // Обратный ход: идя с конца подставляем одно в другое — и получаем все значения
   const x = new Array(n);
   x[n - 1] = dPrime[n - 1];
   for (let i = n - 2; i >= 0; i--) {
