@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Квест (сеть Петри)</title>
+<style>
+  body { font-family: Arial; text-align: center; }
+  button { margin: 10px; padding: 10px; }
+</style>
+</head>
+<body>
+
+<h2>Квест: Найди сокровище</h2>
+<p id="text">Ты в комнате. Есть дверь и сундук.</p>
+
+<button onclick="action('door')">Открыть дверь</button>
+<button onclick="action('chest')">Открыть сундук</button>
+
+<script>
+// сеть Петри (состояния)
+let state = {
+  hasKey: false,
+  doorOpen: false,
+  treasure: false
+};
+
+function action(type) {
+  if (type === 'chest') {
+    if (!state.hasKey) {
+      state.hasKey = true;
+      text.innerText = "Ты нашёл ключ!";
+    } else {
+      text.innerText = "Сундук пуст.";
+    }
+  }
+
+  if (type === 'door') {
+    if (state.hasKey && !state.doorOpen) {
+      state.doorOpen = true;
+      state.treasure = true;
+      text.innerText = "Ты открыл дверь и нашёл сокровище!";
+    } else if (!state.hasKey) {
+      text.innerText = "Дверь закрыта. Нужен ключ.";
+    }
+  }
+}
+</script>
+
+</body>
+</html>

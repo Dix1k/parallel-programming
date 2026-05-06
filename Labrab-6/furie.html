@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Квантовое Фурье-преобразование</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 20px;
+    }
+
+    h2 {
+        color: #38bdf8;
+    }
+
+    input, button {
+        padding: 8px;
+        margin: 5px 0;
+        border-radius: 6px;
+        border: none;
+    }
+
+    input {
+        width: 200px;
+    }
+
+    button {
+        background: #38bdf8;
+        color: black;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    button:hover {
+        background: #0ea5e9;
+    }
+
+    #output {
+        margin-top: 20px;
+        padding: 10px;
+        background: #1e293b;
+        border-radius: 10px;
+        white-space: pre-wrap;
+    }
+
+    .row {
+        margin-bottom: 10px;
+    }
+</style>
+</head>
+<body>
+
+<h2>Квантовое преобразование Фурье</h2>
+
+<div class="row">
+    <label>Количество кубитов (n):</label><br>
+    <input id="n" type="number" min="1" value="3">
+</div>
+
+<div class="row">
+    <label>Базовое состояние |x&gt;:</label><br>
+    <input id="x" type="number" min="0" value="1">
+</div>
+
+<button onclick="runQFT()">Выполнить преобразование</button>
+
+<div id="output"></div>
+
+<script>
+function formatComplex(z) {
+    let real = z.re.toFixed(4);
+    let imag = z.im.toFixed(4);
+
+    return imag >= 0
+        ? `${real}+${imag}i`
+        : `${real}${imag}i`;
+}
+
+function quantumFourierTransform(n, x) {
+    const size = 2 ** n;
+    const result = [];
+
+    for (let y = 0; y < size; y++) {
+        let angle = 2 * Math.PI * x * y / size;
+
+        let complex = {
+            re: Math.cos(angle) / Math.sqrt(size),
+            im: Math.sin(angle) / Math.sqrt(size)
+        };
+
+        result.push(complex);
+    }
+
+    return result;
+}
+
+function runQFT() {
+    const n = parseInt(document.getElementById("n").value);
+    const x = parseInt(document.getElementById("x").value);
+    const output = document.getElementById("output");
+
+    const size = 2 ** n;
+
+    if (x < 0 || x >= size) {
+        output.textContent = `Ошибка: x должно быть от 0 до ${size - 1}`;
+        return;
+    }
+
+    const result = quantumFourierTransform(n, x);
+
+    let text = `Входное состояние: |${x}>\n\n`;
+    text += "Результат квантового преобразования Фурье:\n\n";
+
+    for (let y = 0; y < size; y++) {
+        text += `|${y}>: ${formatComplex(result[y])}\n`;
+    }
+
+    text += "\nПреобразование завершено.";
+
+    output.textContent = text;
+}
+</script>
+
+</body>
+</html>

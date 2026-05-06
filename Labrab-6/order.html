@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Шор (рабочая симуляция)</title>
+
+<style>
+body {
+    font-family: Arial;
+    background:#0f172a;
+    color:#e2e8f0;
+    padding:20px;
+}
+input,button{
+    padding:6px;
+    margin:4px 0;
+}
+button{
+    background:#38bdf8;
+    border:none;
+    font-weight:bold;
+}
+#out{
+    margin-top:15px;
+    background:#1e293b;
+    padding:10px;
+    white-space:pre-wrap;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Алгоритм Шора (исправленный)</h2>
+
+N <input id="n" value="15"><br>
+a <input id="a" value="2"><br>
+Q <input id="q" value="32"><br>
+m <input id="m" value="5"><br>
+
+<button onclick="run()">Запуск</button>
+
+<div id="out"></div>
+
+<script>
+
+// gcd
+function gcd(a,b){
+    while(b){
+        [a,b]=[b,a%b];
+    }
+    return a;
+}
+
+// mod pow
+function modPow(a,e,n){
+    let r=1;
+    a%=n;
+    while(e){
+        if(e&1) r=(r*a)%n;
+        a=(a*a)%n;
+        e>>=1;
+    }
+    return r;
+}
+
+// 🔥 УПРОЩЁННЫЙ ШОРОВСКИЙ ВАРИАНТ (СТАБИЛЬНЫЙ)
+function findOrder(m,q,a,n){
+
+    let value = m / q;
+
+    // ограничим знаменатель (ВАЖНО!)
+    let best = {n:0,d:1,err:999};
+
+    for(let d=1; d<=10; d++){
+        let n0 = Math.round(value*d);
+        let err = Math.abs(value - n0/d);
+
+        if(err < best.err){
+            best = {n:n0,d:d,err};
+        }
+    }
+
+    // проверяем малые r (ключ!)
+    for(let r=1;r<=n;r++){
+        if(modPow(a,r,n)===1){
+            if(r % best.d === 0){
+                return {r, frac:best};
+            }
+        }
+    }
+
+    return {r:null, frac:best};
+}
+
+// факторизация
+function factor(a,r,n){
+    if(!r || r%2) return null;
+
+    let v = modPow(a,r/2,n);
+
+    if(v===n-1) return null;
+
+    let f1=gcd(v-1,n);
+    let f2=gcd(v+1,n);
+
+    if(f1===1||f1===n||f2===1||f2===n) return null;
+
+    return [f1,f2];
+}
+
+function run(){
+
+    let n=+document.getElementById("n").value;
+    let a=+document.getElementById("a").value;
+    let q=+document.getElementById("q").value;
+    let m=+document.getElementById("m").value;
+
+    let out="Исходные данные:\n";
+    out+=`N=${n}\na=${a}\nQ=${q}\nизмерение=${m}\n\n`;
+
+    if(gcd(a,n)!=1){
+        let d=gcd(a,n);
+        out+=`Сразу делители: ${d} и ${n/d}`;
+        document.getElementById("out").innerText=out;
+        return;
+    }
+
+    let res=findOrder(m,q,a,n);
+
+    out+=`Дробь: ${m}/${q} ≈ ${res.frac.n}/${res.frac.d}\n`;
+
+    if(!res.r){
+        out+="Порядок не найден";
+        document.getElementById("out").innerText=out;
+        return;
+    }
+
+    out+=`\nПорядок r = ${res.r}\n`;
+
+    let f=factor(a,res.r,n);
+
+    if(!f){
+        out+="Факторизация не удалась";
+        document.getElementById("out").innerText=out;
+        return;
+    }
+
+    out+=`\nМножители:\n${f[0]} и ${f[1]}`;
+    out+=`\nПроверка: ${f[0]}*${f[1]}=${f[0]*f[1]}`;
+
+    document.getElementById("out").innerText=out;
+}
+
+</script>
+
+</body>
+</html>

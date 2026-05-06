@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Факториал (Акторы)</title>
+</head>
+<body>
+
+<h2>Вычисление факториала</h2>
+<input type="number" id="n" value="5">
+<button onclick="start()">Вычислить</button>
+<p id="result"></p>
+
+<script>
+// актор
+function FactorialActor(n, callback) {
+  if (n <= 1) {
+    callback(1);
+  } else {
+    FactorialActor(n - 1, (res) => {
+      callback(n * res);
+    });
+  }
+}
+
+function start() {
+  let n = parseInt(document.getElementById('n').value);
+  FactorialActor(n, (res) => {
+    result.innerText = "Результат: " + res;
+  });
+}
+</script>
+
+</body>
+</html>

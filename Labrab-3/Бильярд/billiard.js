@@ -1,27 +1,29 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+let score = 0;
+let lastScore = 0;
 
-const FPS = 60;
 const RADIUS = 10;
-const FRICTION = 0.995;
+const FRICTION = 0.99;
+const RESTITUTION = 0.98; // потеря энергии при столкновении
+const POCKET_RADIUS = 22;
 
 let balls = [];
-let cueBall = null;
+let cueBall;
 let mouse = { x: 0, y: 0, down: false };
 
-// Координаты луз (4 штуки по углам)
 const pockets = [
-  { x: RADIUS, y: RADIUS },
-  { x: canvas.width - RADIUS, y: RADIUS },
-  { x: canvas.width - RADIUS, y: canvas.height - RADIUS },
-  { x: RADIUS, y: canvas.height - RADIUS }
+  { x: 0, y: 0 },
+  { x: canvas.width, y: 0 },
+  { x: canvas.width, y: canvas.height },
+  { x: 0, y: canvas.height }
 ];
 
 class Ball {
-  constructor(x, y, r, color) {
+  constructor(x, y, color) {
     this.x = x;
     this.y = y;
-    this.r = r;
+    this.r = RADIUS;
     this.color = color;
     this.vx = 0;
     this.vy = 0;
@@ -32,109 +34,155 @@ class Ball {
     ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
     ctx.fillStyle = this.color;
     ctx.fill();
-    ctx.closePath();
   }
 
   update() {
-    if (Math.abs(this.vx) < 0.1 && Math.abs(this.vy) < 0.1) {
-      this.vx = this.vy = 0;
-    } else {
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vx *= FRICTION;
-      this.vy *= FRICTION;
+    this.x += this.vx;
+    this.y += this.vy;
+
+    this.vx *= FRICTION;
+    this.vy *= FRICTION;
+
+    if (Math.abs(this.vx) < 0.05) this.vx = 0;
+    if (Math.abs(this.vy) < 0.05) this.vy = 0;
+
+    // борта
+    if (this.x - this.r < 0 || this.x + this.r > canvas.width) {
+      this.vx *= -RESTITUTION;
+      this.x = Math.max(this.r, Math.min(canvas.width - this.r, this.x));
     }
 
-    // Отскок от бортов
-    if (this.x - this.r < RADIUS || this.x + this.r > canvas.width - RADIUS) this.vx *= -1;
-    if (this.y - this.r < RADIUS || this.y + this.r > canvas.height - RADIUS) this.vy *= -1;
-
-    // Удержание в пределах стола
-    this.x = Math.max(this.r + RADIUS, Math.min(this.x, canvas.width - this.r - RADIUS));
-    this.y = Math.max(this.r + RADIUS, Math.min(this.y, canvas.height - this.r - RADIUS));
+    if (this.y - this.r < 0 || this.y + this.r > canvas.height) {
+      this.vy *= -RESTITUTION;
+      this.y = Math.max(this.r, Math.min(canvas.height - this.r, this.y));
+    }
   }
 }
 
 function initBalls() {
   balls = [];
-  const colors = ['white', 'yellow', 'red', 'blue', 'orange', 'green', 'brown'];
-  for (let i = 0; i < colors.length; i++) {
-    let x = canvas.width / 2 + (i - colors.length / 2) * (RADIUS * 2.5);
-    let y = canvas.height / 2;
-    balls.push(new Ball(x, y, RADIUS, colors[i]));
+
+  cueBall = new Ball(150, canvas.height / 2, 'white');
+  balls.push(cueBall);
+
+  // пирамида
+  let colors = ['red','yellow','blue','orange','green','brown'];
+  let startX = canvas.width - 200;
+  let startY = canvas.height / 2;
+
+  let index = 0;
+  for (let row = 0; row < 3; row++) {
+    for (let i = 0; i <= row; i++) {
+      balls.push(new Ball(
+        startX + row * RADIUS * 2,
+        startY + (i - row / 2) * RADIUS * 2,
+        colors[index++ % colors.length]
+      ));
+    }
   }
-  cueBall = balls[0];
+}
+
+function resolveCollision(b1, b2) {
+  let dx = b2.x - b1.x;
+  let dy = b2.y - b1.y;
+  let dist = Math.hypot(dx, dy);
+
+  if (dist === 0) return;
+
+  if (dist < b1.r + b2.r) {
+    let nx = dx / dist;
+    let ny = dy / dist;
+
+    let p = 2 * (
+      b1.vx * nx + b1.vy * ny -
+      b2.vx * nx - b2.vy * ny
+    ) / 2;
+
+    b1.vx -= p * nx * RESTITUTION;
+    b1.vy -= p * ny * RESTITUTION;
+    b2.vx += p * nx * RESTITUTION;
+    b2.vy += p * ny * RESTITUTION;
+
+    // раздвигаем
+    let overlap = b1.r + b2.r - dist;
+    b1.x -= overlap * nx / 2;
+    b1.y -= overlap * ny / 2;
+    b2.x += overlap * nx / 2;
+    b2.y += overlap * ny / 2;
+  }
 }
 
 function checkCollisions() {
   for (let i = 0; i < balls.length; i++) {
     for (let j = i + 1; j < balls.length; j++) {
-      let dx = balls[j].x - balls[i].x;
-      let dy = balls[j].y - balls[i].y;
-      let dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < balls[i].r + balls[j].r) {
-        let angle = Math.atan2(dy, dx);
-        let sin = Math.sin(angle);
-        let cos = Math.cos(angle);
-        let vx1n = balls[i].vx * cos + balls[i].vy * sin;
-        let vy1n = -balls[i].vx * sin + balls[i].vy * cos;
-        let vx2n = balls[j].vx * cos + balls[j].vy * sin;
-        let vy2n = -balls[j].vx * sin + balls[j].vy * cos;
-
-        // Обмен нормальными скоростями
-        let tempVxN = vx1n;
-        vx1n = vx2n;
-        vx2n = tempVxN;
-
-        // Обратное преобразование
-        balls[i].vx = vx1n * cos - vy1n * sin;
-        balls[i].vy = vx1n * sin + vy1n * cos;
-        balls[j].vx = vx2n * cos - vy2n * sin;
-        balls[j].vy = vx2n * sin + vy2n * cos;
-
-        // Раздвигаем шары
-        let overlap = (balls[i].r + balls[j].r - dist) / 2;
-        let moveX = overlap * cos;
-        let moveY = overlap * sin;
-        balls[i].x -= moveX;
-        balls[i].y -= moveY;
-        balls[j].x += moveX;
-        balls[j].y += moveY;
-      }
+      resolveCollision(balls[i], balls[j]);
     }
   }
 }
 
 function checkPockets() {
-  // Проверяем попадание в лунки
   for (let i = balls.length - 1; i >= 0; i--) {
-    const ball = balls[i];
-    for (let pocket of pockets) {
-      const dx = ball.x - pocket.x;
-      const dy = ball.y - pocket.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < pocket.x / 2) { // попадание в лунку
-        if (ball === cueBall) {
-          initBalls(); // Перезапуск игры
-          return; // Выходим, чтобы не проверять другие шары
+    let b = balls[i];
+
+    for (let p of pockets) {
+      let dx = b.x - p.x;
+      let dy = b.y - p.y;
+      let dist = Math.hypot(dx, dy);
+
+      // учитываем радиус шара
+      if (dist < POCKET_RADIUS + b.r * 0.5) {
+
+        if (b === cueBall) {
+          endGame();
+          return;
         } else {
-          balls.splice(i, 1); // Удаляем шар
-          break; // Переходим к следующему шару
+          balls.splice(i, 1);
+          score++;
+
+          if (balls.length === 1) {
+            endGame();
+            return;
+          }
+
+          break;
         }
       }
     }
   }
 }
 
+function endGame() {
+  lastScore = score;
+
+  setTimeout(() => {
+    alert(`Игра окончена! Счёт: ${lastScore}`);
+    score = 0;
+    initBalls();
+  }, 100);
+}
+
+function allStopped() {
+  return balls.every(b => b.vx === 0 && b.vy === 0);
+}
+
+function drawAim() {
+  if (!mouse.down || !allStopped()) return;
+
+  ctx.beginPath();
+  ctx.moveTo(cueBall.x, cueBall.y);
+  ctx.lineTo(mouse.x, mouse.y);
+  ctx.strokeStyle = 'white';
+  ctx.stroke();
+}
+
 function drawTable() {
-  ctx.fillStyle = '#006400';
+  ctx.fillStyle = '#0a5f2c';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Рисуем лунки
-  ctx.fillStyle = '#000';
-  for (let pocket of pockets) {
+  ctx.fillStyle = 'black';
+  for (let p of pockets) {
     ctx.beginPath();
-    ctx.arc(pocket.x, pocket.y, RADIUS * 1.5, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, POCKET_RADIUS, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -142,39 +190,61 @@ function drawTable() {
 function loop() {
   drawTable();
 
-  for (let ball of balls) ball.update();
+  balls.forEach(b => b.update());
 
   checkCollisions();
+  checkPockets();
 
-  checkPockets(); // Проверка попадания в лунки
+  balls.forEach(b => b.draw());
 
-  for (let ball of balls) ball.draw();
+  drawAim();
 
   requestAnimationFrame(loop);
 }
 
-canvas.addEventListener('mousedown', e => {
-  mouse.down = true;
-});
-canvas.addEventListener('mouseup', e => {
-  if (!mouse.down) return;
+// управление
+canvas.addEventListener('mousedown', () => mouse.down = true);
 
-  let dx = mouse.x - cueBall.x;
-  let dy = mouse.y - cueBall.y;
-  let dist = Math.sqrt(dx * dx + dy * dy);
+canvas.addEventListener('mouseup', () => {
+  if (!mouse.down || !allStopped()) return;
 
-  if (dist > cueBall.r) {
-    let power = Math.min(15, dist / canvas.width * FPS);
-    cueBall.vy += (dy / dist) * power;
-    cueBall.vx += (dx / dist) * power;
-  }
+  let dx = cueBall.x - mouse.x;
+  let dy = cueBall.y - mouse.y;
+  let dist = Math.hypot(dx, dy);
+
+  let power = Math.min(20, dist * 0.1);
+
+  cueBall.vx = (dx / dist) * power;
+  cueBall.vy = (dy / dist) * power;
+
+  mouse.down = false;
 });
+
 canvas.addEventListener('mousemove', e => {
-  const rect = canvas.getBoundingClientRect();
-  mouse.x = e.clientX - rect.left; // Исправлено!
-  mouse.y = e.clientY - rect.top;   // Исправлено!
+  let rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
 });
-canvas.addEventListener('mouseleave', () => { mouse.down = false; });
+
+function drawTable() {
+  ctx.fillStyle = '#0a5f2c';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'black';
+  for (let p of pockets) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, POCKET_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ТЕКУЩИЙ СЧЁТ
+  ctx.fillStyle = 'white';
+  ctx.font = '16px Arial';
+  ctx.fillText(`Счёт: ${score}`, 10, 20);
+
+  // ПРОШЛЫЙ СЧЁТ
+  ctx.fillText(`Прошлый: ${lastScore}`, 10, 40);
+}
 
 initBalls();
 loop();

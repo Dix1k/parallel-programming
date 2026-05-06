@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Читатели и писатели</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #1e1e1e;
+    color: white;
+    text-align: center;
+    padding: 20px;
+}
+
+button {
+    margin: 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+}
+
+#log {
+    margin-top: 20px;
+    height: 250px;
+    overflow-y: auto;
+    background: #2b2b2b;
+    padding: 10px;
+    text-align: left;
+}
+.reader { color: #4caf50; }
+.writer { color: #ff5252; }
+</style>
+</head>
+
+<body>
+
+<h2>Actor Model: Читатели и Писатели</h2>
+
+<button id="readBtn">Читать</button>
+<button id="writeBtn">Писать</button>
+
+<div id="status">Готово</div>
+<div id="log"></div>
+
+<script>
+class System {
+    constructor() {
+        this.readers = 0;
+        this.writing = false;
+        this.queue = [];
+
+        this.rId = 1;
+        this.wId = 1;
+    }
+
+    log(msg, cls) {
+        const el = document.getElementById("log");
+        const div = document.createElement("div");
+        div.className = cls || "";
+        div.textContent = msg;
+        el.appendChild(div);
+        el.scrollTop = el.scrollHeight;
+    }
+
+    update() {
+        document.getElementById("status").textContent =
+            "Читателей: " + this.readers + " | Пишет: " + this.writing;
+    }
+
+    read() {
+        const id = this.rId++;
+
+        this.log("📖 Читатель #" + id + " запросил доступ", "reader");
+
+        if (!this.writing) {
+            this.startRead(id);
+        } else {
+            this.queue.push({type:"read", id});
+        }
+    }
+
+    startRead(id) {
+        this.readers++;
+        this.update();
+
+        this.log("📖 Читатель #" + id + " читает", "reader");
+
+        setTimeout(() => {
+            this.readers--;
+            this.log("📖 Читатель #" + id + " закончил", "reader");
+            this.update();
+            this.next();
+        }, 1500);
+    }
+
+    write() {
+        const id = this.wId++;
+
+        this.log("✍️ Писатель #" + id + " запросил доступ", "writer");
+
+        if (!this.writing && this.readers === 0) {
+            this.startWrite(id);
+        } else {
+            this.queue.push({type:"write", id});
+        }
+    }
+
+    startWrite(id) {
+        this.writing = true;
+        this.update();
+
+        this.log("✍️ Писатель #" + id + " пишет", "writer");
+
+        setTimeout(() => {
+            this.writing = false;
+            this.log("✍️ Писатель #" + id + " закончил", "writer");
+            this.update();
+            this.next();
+        }, 2000);
+    }
+
+    next() {
+        if (this.queue.length === 0) return;
+
+        const task = this.queue.shift();
+
+        if (task.type === "read") {
+            if (!this.writing) this.startRead(task.id);
+            else this.queue.unshift(task);
+        } else {
+            if (!this.writing && this.readers === 0) {
+                this.startWrite(task.id);
+            } else {
+                this.queue.unshift(task);
+            }
+        }
+    }
+}
+
+const sys = new System();
+
+document.getElementById("readBtn").onclick = () => sys.read();
+document.getElementById("writeBtn").onclick = () => sys.write();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Максимум</title>
+</head>
+<body>
+
+<h2>Поиск максимума</h2>
+<input id="arr" value="1,5,3,9,2,9">
+<button onclick="run()">Найти</button>
+<p id="res"></p>
+
+<script>
+function maxActor(arr, callback) {
+  if (arr.length === 1) return callback(arr[0]);
+
+  let mid = Math.floor(arr.length / 2);
+
+  maxActor(arr.slice(0, mid), (a) => {
+    maxActor(arr.slice(mid), (b) => {
+      callback(Math.max(a, b));
+    });
+  });
+}
+
+function run() {
+  let arr = document.getElementById('arr').value.split(',').map(Number);
+
+  maxActor(arr, (max) => {
+    res.innerText = "Максимум: " + max;
+  });
+}
+</script>
+
+</body>
+</html>

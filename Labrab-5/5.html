@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Акторы: лабиринт</title>
+<style>
+  body { font-family: Arial; text-align: center; background:#111; color:white; }
+  canvas { background:#222; margin-top:10px; border:1px solid #444; }
+  button { margin:10px; padding:10px; }
+</style>
+</head>
+<body>
+
+<h2>Акторная модель: поиск выхода из лабиринта</h2>
+
+<button onclick="start()">Сгенерировать и решить</button>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+const CELL = 20;
+const N = 15;
+
+canvas.width = canvas.height = N * CELL;
+
+let grid = [];
+let startCell, endCell;
+let path = [];
+
+class Cell {
+  constructor(x,y){
+    this.x=x; this.y=y;
+    this.walls=[true,true,true,true]; // top right bottom left
+    this.visited=false;
+  }
+}
+
+function idx(x,y){ return x + y*N; }
+
+function generateMaze(){
+  grid = [];
+  for(let y=0;y<N;y++){
+    for(let x=0;x<N;x++){
+      grid.push(new Cell(x,y));
+    }
+  }
+
+  let stack = [];
+  let current = grid[0];
+  current.visited = true;
+
+  function neighbors(c){
+    let n=[];
+    let {x,y}=c;
+
+    if(y>0 && !grid[idx(x,y-1)].visited) n.push(grid[idx(x,y-1)]);
+    if(x<N-1 && !grid[idx(x+1,y)].visited) n.push(grid[idx(x+1,y)]);
+    if(y<N-1 && !grid[idx(x,y+1)].visited) n.push(grid[idx(x,y+1)]);
+    if(x>0 && !grid[idx(x-1,y)].visited) n.push(grid[idx(x-1,y)]);
+
+    return n;
+  }
+
+  function removeWalls(a,b){
+    let dx=a.x-b.x;
+    let dy=a.y-b.y;
+
+    if(dx===1){ a.walls[3]=false; b.walls[1]=false; }
+    if(dx===-1){ a.walls[1]=false; b.walls[3]=false; }
+    if(dy===1){ a.walls[0]=false; b.walls[2]=false; }
+    if(dy===-1){ a.walls[2]=false; b.walls[0]=false; }
+  }
+
+  while(true){
+    let n = neighbors(current);
+    if(n.length>0){
+      let next = n[Math.floor(Math.random()*n.length)];
+      next.visited=true;
+
+      stack.push(current);
+      removeWalls(current,next);
+      current = next;
+    } else if(stack.length){
+      current = stack.pop();
+    } else break;
+  }
+
+  startCell = grid[0];
+  endCell = grid[grid.length-1];
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // рисуем лабиринт
+  for(let c of grid){
+    let x=c.x*CELL;
+    let y=c.y*CELL;
+
+    ctx.strokeStyle="#555";
+    ctx.lineWidth=2;
+
+    if(c.walls[0]) drawLine(x,y,x+CELL,y);
+    if(c.walls[1]) drawLine(x+CELL,y,x+CELL,y+CELL);
+    if(c.walls[2]) drawLine(x+CELL,y+CELL,x,y+CELL);
+    if(c.walls[3]) drawLine(x,y+CELL,x,y);
+
+    // вход
+    if(c===startCell){
+      ctx.fillStyle="green";
+      ctx.fillRect(x+5,y+5,CELL-10,CELL-10);
+    }
+
+    // выход
+    if(c===endCell){
+      ctx.fillStyle="red";
+      ctx.fillRect(x+5,y+5,CELL-10,CELL-10);
+    }
+  }
+
+  // ===== ЛИНИЯ ПУТИ =====
+  if(path.length > 0){
+    ctx.beginPath();
+    ctx.strokeStyle = "cyan";
+    ctx.lineWidth = 4;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    let first = path[0];
+    ctx.moveTo(
+      first.x * CELL + CELL/2,
+      first.y * CELL + CELL/2
+    );
+
+    for(let i=1;i<path.length;i++){
+      let p = path[i];
+      ctx.lineTo(
+        p.x * CELL + CELL/2,
+        p.y * CELL + CELL/2
+      );
+    }
+
+    ctx.stroke();
+  }
+}
+
+function drawLine(x1,y1,x2,y2){
+  ctx.beginPath();
+  ctx.moveTo(x1,y1);
+  ctx.lineTo(x2,y2);
+  ctx.stroke();
+}
+
+/* ===== АКТОР: поиск пути (BFS как система акторов) ===== */
+
+function solve(){
+  let queue = [];
+  let visited = new Set();
+  let parent = new Map();
+
+  function key(c){ return c.x+","+c.y; }
+
+  queue.push(startCell);
+  visited.add(key(startCell));
+
+  function canMove(a,b){
+    let dx=a.x-b.x;
+    let dy=a.y-b.y;
+
+    if(dx===1) return !a.walls[3];
+    if(dx===-1) return !a.walls[1];
+    if(dy===1) return !a.walls[0];
+    if(dy===-1) return !a.walls[2];
+    return false;
+  }
+
+  let interval = setInterval(()=>{
+    if(queue.length===0){
+      clearInterval(interval);
+      return;
+    }
+
+    let current = queue.shift();
+
+    if(current===endCell){
+      clearInterval(interval);
+      reconstruct(parent);
+      return;
+    }
+
+    let dirs=[
+      [1,0],[-1,0],[0,1],[0,-1]
+    ];
+
+    for(let [dx,dy] of dirs){
+      let nx=current.x+dx;
+      let ny=current.y+dy;
+
+      if(nx<0||ny<0||nx>=N||ny>=N) continue;
+
+      let next=grid[idx(nx,ny)];
+
+      if(!visited.has(key(next)) && canMove(current,next)){
+        visited.add(key(next));
+        parent.set(key(next), current);
+        queue.push(next);
+      }
+    }
+
+    draw();
+  }, 10);
+}
+
+function reconstruct(parent){
+  path=[];
+  let cur=endCell;while(cur){
+    path.push(cur);
+    cur=parent.get(cur.x+","+cur.y);
+  }
+
+  path.reverse();
+  draw();
+}
+
+function start(){
+  path=[];
+  generateMaze();
+  draw();
+  solve();
+}
+
+generateMaze();
+draw();
+
+</script>
+</body>
+</html>

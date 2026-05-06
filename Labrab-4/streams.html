@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Потоки данных</title>
+<style>
+  canvas { border:1px solid black; }
+</style>
+</head>
+<body>
+
+<h2>Обработка потоков (очередь)</h2>
+<canvas id="canvas" width="500" height="200"></canvas><br>
+<button onclick="addData()">Добавить данные</button>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let queue = [];
+
+function addData() {
+  queue.push(Math.floor(Math.random()*100));
+}
+
+function process() {
+  if (queue.length > 0) {
+    queue.shift(); // обработка (удаление)
+  }
+}
+
+function draw() {
+  ctx.clearRect(0,0,500,200);
+
+  queue.forEach((val, i) => {
+    ctx.fillStyle = "blue";
+    ctx.fillRect(20 + i*50, 100, 40, -val);
+    ctx.fillStyle = "black";
+    ctx.fillText(val, 25 + i*50, 120);
+  });
+}
+
+setInterval(() => {
+  process();
+  draw();
+}, 1000);
+</script>
+
+</body>
+</html>
